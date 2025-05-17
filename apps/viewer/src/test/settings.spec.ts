@@ -171,3 +171,33 @@ test("Should correctly parse metadata", async ({ page }) => {
     ),
   ).toBe("John Doe");
 });
+
+test("Should correctly parse custom script in metadata", async ({ page }) => {
+  const typebotId = createId();
+  const customMetadata: Settings["metadata"] = {
+    customHeadCode:
+      '<script id="custom-script">window.customVar = "testValue";</script>',
+  };
+  await createTypebots([
+    {
+      id: typebotId,
+      settings: {
+        metadata: customMetadata,
+      },
+      ...parseDefaultGroupWithBlock({
+        type: InputBlockType.TEXT,
+      }),
+    },
+  ]);
+  await page.goto(`/${typebotId}-public`);
+
+  // Verify that the custom script is added to the page
+  const customVarValue = await page.evaluate(() => (window as any).customVar);
+  expect(customVarValue).toBe("testValue");
+
+  // Verify that the script tag exists in the DOM
+  const scriptExists = await page.evaluate(() =>
+    Boolean(document.querySelector("script#custom-script")),
+  );
+  expect(scriptExists).toBe(true);
+});
