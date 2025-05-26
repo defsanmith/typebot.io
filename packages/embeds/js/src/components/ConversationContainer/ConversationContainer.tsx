@@ -31,6 +31,7 @@ import type {
   ContinueChatResponse,
   Message,
   StartChatResponse,
+  TextChatBubble,
 } from "@typebot.io/chat-api/schemas";
 import { parseUnknownClientError } from "@typebot.io/lib/parseUnknownClientError";
 import { isNotDefined } from "@typebot.io/lib/utils";
@@ -52,6 +53,7 @@ import {
 } from "solid-js";
 import { ChatChunk } from "./ChatChunk";
 import { LoadingChunk } from "./LoadingChunk";
+import { DownloadIcon } from "./icons/DownloadIcon";
 
 const AUTO_SCROLL_CLIENT_HEIGHT_PERCENT_TOLERANCE = 0.6;
 const AUTO_SCROLL_DELAY = 50;
@@ -127,6 +129,14 @@ export const ConversationContainer = (props: Props) => {
     ),
     {
       key: `typebot-${props.context.typebot.id}-avatarsHistory`,
+      storage: props.context.storage,
+    },
+  );
+
+  const [answers, setAnswers] = persist(
+    createSignal<{ [key: string]: string }>({}),
+    {
+      key: `typebot-${props.context.typebot.id}-answers`,
       storage: props.context.storage,
     },
   );
@@ -236,11 +246,17 @@ export const ConversationContainer = (props: Props) => {
     const currentInputBlock = [...chatChunks()].pop()?.input;
 
     if (currentInputBlock?.id && answer) {
-      if (props.onAnswer)
+      const answerContent = getAnswerContent(answer);
+      if (props.onAnswer) {
         props.onAnswer({
-          message: getAnswerContent(answer),
+          message: answerContent,
           blockId: currentInputBlock.id,
         });
+      }
+      setAnswers((prev) => ({
+        ...prev,
+        [currentInputBlock.id]: answerContent,
+      }));
       setInputAnswered((prev) => ({
         ...prev,
         [parseInputUniqueKey(currentInputBlock.id)]: true,
@@ -552,6 +568,48 @@ export const ConversationContainer = (props: Props) => {
 
   const handleSkip = () => sendMessage(undefined);
 
+  const handleDownloadChat = () => {
+    const chatContent = chatChunks()
+      .map((chunk) => {
+        const messages = chunk.messages.map((msg) => {
+          if (msg.type === "text") {
+            const textBubble = msg as TextChatBubble;
+            if (
+              textBubble.content.type === "richText" &&
+              textBubble.content.richText
+            ) {
+              return `Bot: ${textBubble.content.richText
+                .map(
+                  (block: { children?: { text?: string }[] }) =>
+                    block.children
+                      ?.map((child: { text?: string }) => child.text ?? "")
+                      .join("") ?? "",
+                )
+                .join("\n")}`;
+            }
+          }
+          return `Bot: [${msg.type} content]`;
+        });
+
+        const userInput =
+          chunk.input && answers()[chunk.input.id]
+            ? `You: ${answers()[chunk.input.id]}`
+            : "";
+        return [...messages, userInput].filter(Boolean).join("\n");
+      })
+      .join("\n\n");
+
+    const blob = new Blob([chatContent], { type: "text/plain" });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `chat-${new Date().toISOString().split("T")[0]}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+  };
+
   return (
     <div
       ref={chatContainer}
@@ -615,6 +673,15 @@ export const ConversationContainer = (props: Props) => {
                 ?.avatarUrl
             }
           />
+        </Show>
+        <Show when={isEnded()}>
+          <button
+            onClick={handleDownloadChat}
+            class="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 self-center mt-4"
+          >
+            <DownloadIcon class="w-4 h-4" />
+            Download Chat
+          </button>
         </Show>
       </div>
 
