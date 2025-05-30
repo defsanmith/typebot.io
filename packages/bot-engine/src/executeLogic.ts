@@ -3,9 +3,11 @@ import type { LogicBlock } from "@typebot.io/blocks-logic/schema";
 import type { SessionState } from "@typebot.io/chat-session/schemas";
 import type { SessionStore } from "@typebot.io/runtime-session-store";
 import type { SetVariableHistoryItem } from "@typebot.io/variables/schemas";
+import type { Variable } from "@typebot.io/variables/schemas";
 import { executeAbTest } from "./blocks/logic/abTest/executeAbTest";
 import { executeConditionBlock } from "./blocks/logic/condition/executeConditionBlock";
 import { executeJumpBlock } from "./blocks/logic/jump/executeJumpBlock";
+import { executeLoopBlock } from "./blocks/logic/loop/executeLoopBlock";
 import { executeRedirect } from "./blocks/logic/redirect/executeRedirect";
 import { executeReturnBlock } from "./blocks/logic/return/executeReturnBlock";
 import { executeScript } from "./blocks/logic/script/executeScript";
@@ -26,6 +28,12 @@ export const executeLogic = async ({
   setVariableHistory: SetVariableHistoryItem[];
   sessionStore: SessionStore;
 }): Promise<ExecuteLogicResponse> => {
+  const currentTypebotInQueue = state.typebotsQueue?.[0]?.typebot;
+  const variables: Variable[] = currentTypebotInQueue?.variables ?? [];
+  const runtimeOptions = {
+    resultId: state.typebotsQueue?.[0]?.resultId,
+  };
+
   switch (block.type) {
     case LogicBlockType.SET_VARIABLE:
       return executeSetVariable(block, {
@@ -51,5 +59,11 @@ export const executeLogic = async ({
       return executeWebhookBlock(block);
     case LogicBlockType.RETURN:
       return executeReturnBlock(state);
+    case LogicBlockType.LOOP:
+      return executeLoopBlock(block, state, variables, runtimeOptions as any);
+    default:
+      throw new Error(
+        `Unsupported logic block type: ${(block as LogicBlock).type}`,
+      );
   }
 };
