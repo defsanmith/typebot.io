@@ -43,6 +43,7 @@ import {
   defaultContainerBackgroundColor,
 } from "@typebot.io/theme/constants";
 import { cx } from "@typebot.io/ui/lib/cva";
+import { jsPDF } from "jspdf";
 import {
   For,
   Show,
@@ -119,6 +120,7 @@ export const ConversationContainer = (props: Props) => {
   const [inputAnswered, setInputAnswered] = createSignal<{
     [key: string]: boolean;
   }>({});
+  const [hasUserResponded, setHasUserResponded] = createSignal(false);
 
   const [avatarsHistory, setAvatarsHistory] = persist(
     createSignal<AvatarHistory[]>(
@@ -246,6 +248,7 @@ export const ConversationContainer = (props: Props) => {
     const currentInputBlock = [...chatChunks()].pop()?.input;
 
     if (currentInputBlock?.id && answer) {
+      setHasUserResponded(true);
       const answerContent = getAnswerContent(answer);
       if (props.onAnswer) {
         props.onAnswer({
@@ -599,15 +602,32 @@ export const ConversationContainer = (props: Props) => {
       })
       .join("\n\n");
 
-    const blob = new Blob([chatContent], { type: "text/plain" });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `chat-${new Date().toISOString().split("T")[0]}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
+    const doc = new jsPDF();
+    const splitText = doc.splitTextToSize(chatContent, 180);
+    let yPosition = 20;
+    const pageHeight = doc.internal.pageSize.height;
+
+    // Add title
+    doc.setFontSize(16);
+    doc.text("Chat Conversation", 105, 10, { align: "center" });
+    doc.setFontSize(12);
+
+    // Add date
+    const date = new Date().toLocaleDateString();
+    doc.text(`Date: ${date}`, 20, yPosition);
+    yPosition += 10;
+
+    // Add content with pagination
+    splitText.forEach((line: string) => {
+      if (yPosition >= pageHeight - 20) {
+        doc.addPage();
+        yPosition = 20;
+      }
+      doc.text(line, 20, yPosition);
+      yPosition += 7;
+    });
+
+    doc.save(`chat-${new Date().toISOString().split("T")[0]}.pdf`);
   };
 
   return (
@@ -674,7 +694,7 @@ export const ConversationContainer = (props: Props) => {
             }
           />
         </Show>
-        <Show when={isEnded()}>
+        <Show when={hasUserResponded()}>
           <button
             onClick={handleDownloadChat}
             class="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 self-center mt-4"
