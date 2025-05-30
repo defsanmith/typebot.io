@@ -28,6 +28,7 @@ import { ZapierLogo } from "@/features/blocks/integrations/zapier/components/Zap
 import { AbTestIcon } from "@/features/blocks/logic/abTest/components/AbTestIcon";
 import { ConditionIcon } from "@/features/blocks/logic/condition/components/ConditionIcon";
 import { JumpIcon } from "@/features/blocks/logic/jump/components/JumpIcon";
+import { LoopIcon } from "@/features/blocks/logic/loop/components/LoopIcon";
 import { RedirectIcon } from "@/features/blocks/logic/redirect/components/RedirectIcon";
 import { ReturnBlockIcon } from "@/features/blocks/logic/return/components/ReturnBlockIcon";
 import { ScriptIcon } from "@/features/blocks/logic/script/components/ScriptIcon";
@@ -109,6 +110,8 @@ export const BlockIcon = ({ type, ...props }: BlockIconProps): JSX.Element => {
       return <ReturnBlockIcon color={purple} {...props} />;
     case LogicBlockType.WEBHOOK:
       return <WebhookIcon {...props} />;
+    case LogicBlockType.LOOP:
+      return <LoopIcon color={purple} {...props} />;
     case IntegrationBlockType.GOOGLE_SHEETS:
       return <GoogleSheetsLogo {...props} />;
     case IntegrationBlockType.GOOGLE_ANALYTICS:

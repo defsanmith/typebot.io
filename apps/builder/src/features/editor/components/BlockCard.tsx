@@ -89,6 +89,16 @@ export const BlockCard = (
           <BlockLabel type={props.type} />
         </BlockCardLayout>
       );
+    case LogicBlockType.LOOP:
+      return (
+        <BlockCardLayout
+          {...props}
+          tooltip={t("editor.blockCard.logicBlock.tooltip.loop.label")}
+        >
+          <BlockIcon type={props.type} />
+          <BlockLabel type={props.type} />
+        </BlockCardLayout>
+      );
     case IntegrationBlockType.GOOGLE_SHEETS:
       return (
         <BlockCardLayout

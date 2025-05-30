@@ -29,6 +29,7 @@ import { ZapierContent } from "@/features/blocks/integrations/zapier/components/
 import { AbTestNodeBody } from "@/features/blocks/logic/abTest/components/AbTestNodeBody";
 import { ConditionBlockContent } from "@/features/blocks/logic/condition/components/ConditionBlockContent";
 import { JumpNodeBody } from "@/features/blocks/logic/jump/components/JumpNodeBody";
+import { LoopNodeBody } from "@/features/blocks/logic/loop/components/LoopNodeBody";
 import { RedirectNodeContent } from "@/features/blocks/logic/redirect/components/RedirectNodeContent";
 import { ReturnBlockNodeContent } from "@/features/blocks/logic/return/components/ReturnBlockNodeContent";
 import { ScriptNodeContent } from "@/features/blocks/logic/script/components/ScriptNodeContent";
@@ -137,6 +138,8 @@ export const BlockNodeContent = ({
       return <WebhookNodeContent options={block.options} />;
     case LogicBlockType.RETURN:
       return <ReturnBlockNodeContent />;
+    case LogicBlockType.LOOP:
+      return <LoopNodeBody options={block.options} />;
     case IntegrationBlockType.GOOGLE_SHEETS: {
       return <GoogleSheetsNodeContent options={block.options} />;
     }
