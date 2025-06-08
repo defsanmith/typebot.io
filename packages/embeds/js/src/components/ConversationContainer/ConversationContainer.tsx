@@ -27,6 +27,7 @@ import type {
   ContinueChatResponse,
   Message,
   StartChatResponse,
+  TextChatBubble,
 } from "@typebot.io/chat-api/schemas";
 import { parseUnknownClientError } from "@typebot.io/lib/parseUnknownClientError";
 import { isNotDefined } from "@typebot.io/lib/utils";
@@ -38,6 +39,7 @@ import {
   defaultContainerBackgroundColor,
 } from "@typebot.io/theme/constants";
 import { cx } from "@typebot.io/ui/lib/cva";
+import { jsPDF } from "jspdf";
 import {
   Index,
   Show,
@@ -49,6 +51,7 @@ import {
 } from "solid-js";
 import { ChatChunk } from "./ChatChunk";
 import { LoadingChunk } from "./LoadingChunk";
+import { DownloadIcon } from "./icons/DownloadIcon";
 
 const AUTO_SCROLL_CLIENT_HEIGHT_PERCENT_TOLERANCE = 0.6;
 const AUTO_SCROLL_DELAY = 50;
@@ -103,6 +106,7 @@ export const ConversationContainer = (props: Props) => {
   const [isLastAutoScrollAtBottom, setIsLastAutoScrollAtBottom] =
     createSignal(true);
   const [hasError, setHasError] = createSignal(false);
+  const [hasUserResponded, setHasUserResponded] = createSignal(false);
 
   onMount(() => {
     window.addEventListener("message", processIncomingEvent);
@@ -195,8 +199,10 @@ export const ConversationContainer = (props: Props) => {
   const sendMessage = async (
     answer?: InputSubmitContent | ClientSideResult,
   ) => {
-    if (answer && answer.type !== "clientSideResult")
+    if (answer && answer.type !== "clientSideResult") {
       setChatChunks(addAnswerToLastChunk(answer));
+      setHasUserResponded(true);
+    }
     const currentChunk = chatChunks().at(-1);
     if (hasError() && (currentChunk?.clientSideActions ?? []).length > 0) {
       setHasError(false);
@@ -495,6 +501,65 @@ export const ConversationContainer = (props: Props) => {
     () => chatContainer,
   );
 
+  const handleDownloadChat = () => {
+    const chatContent = chatChunks()
+      .map((chunk) => {
+        const messages = chunk.messages.map((msg) => {
+          if (msg.type === "text") {
+            const textBubble = msg as TextChatBubble;
+            if (
+              textBubble.content.type === "richText" &&
+              textBubble.content.richText
+            ) {
+              return `Bot: ${textBubble.content.richText
+                .map(
+                  (block: { children?: { text?: string }[] }) =>
+                    block.children
+                      ?.map((child: { text?: string }) => child.text ?? "")
+                      .join("") ?? "",
+                )
+                .join("\n")}`;
+            }
+          }
+          return `Bot: [${msg.type} content]`;
+        });
+
+        const userInput =
+          chunk.input && chunk.input.answer
+            ? `You: ${getAnswerContent(chunk.input.answer)}`
+            : "";
+        return [...messages, userInput].filter(Boolean).join("\n");
+      })
+      .join("\n\n");
+
+    const doc = new jsPDF();
+    const splitText = doc.splitTextToSize(chatContent, 180);
+    let yPosition = 20;
+    const pageHeight = doc.internal.pageSize.height;
+
+    // Add title
+    doc.setFontSize(16);
+    doc.text("Chat Conversation", 105, 10, { align: "center" });
+    doc.setFontSize(12);
+
+    // Add date
+    const date = new Date().toLocaleDateString();
+    doc.text(`Date: ${date}`, 20, yPosition);
+    yPosition += 10;
+
+    // Add content with pagination
+    splitText.forEach((line: string) => {
+      if (yPosition >= pageHeight - 20) {
+        doc.addPage();
+        yPosition = 20;
+      }
+      doc.text(line, 20, yPosition);
+      yPosition += 7;
+    });
+
+    doc.save(`chat-${new Date().toISOString().split("T")[0]}.pdf`);
+  };
+
   return (
     <ChatContainerSizeContext.Provider value={chatContainerSize}>
       <div
@@ -538,6 +603,15 @@ export const ConversationContainer = (props: Props) => {
           <Show when={isSending()}>
             <LoadingChunk theme={latestTheme()} />
           </Show>
+          <Show when={hasUserResponded()}>
+            <button
+              onClick={handleDownloadChat}
+              class="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 self-center mt-4"
+            >
+              <DownloadIcon class="w-4 h-4" />
+              Download Chat
+            </button>
+          </Show>
         </div>
 
         <BottomSpacer />
@@ -548,7 +622,7 @@ export const ConversationContainer = (props: Props) => {
 
 // Needed because we need to simulate a bottom padding relative to the chat view height
 const BottomSpacer = () => (
-  <div class="w-full flex-shrink-0 typebot-bottom-spacer h-5" />
+  <div class="w-full flex-shrink-0 typebot-bottom-spacer h-[20%]" />
 );
 
 const convertSubmitContentToMessage = (
